@@ -1,0 +1,17 @@
+[simulation]
+reynolds_number = 1000
+lid_velocity = 1.0
+cavity_size = 1.0
+grid_points_x = 500
+grid_points_y = 500
+time_step = 0.00001
+max_iterations = 1000
+
+[stability]
+cfl_number = 0.5
+artificial_viscosity = 0.1
+
+[visualization]
+plot_interval = 50
+contour_levels = 20
+quiver_spacing = 2 
