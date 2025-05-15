@@ -33,6 +33,11 @@ class SimulationCLI:
         self.parser.add_argument("--plot_interval", type=int, help="Plot interval")
         self.parser.add_argument("--contour_levels", type=int, help="Contour levels")
         self.parser.add_argument("--quiver_spacing", type=int, help="Quiver spacing")
+        self.parser.add_argument(
+            "--show_velocities",
+            action="store_true",
+            help="Show velocity vectors at every cell",
+        )
 
     def load_config(self, config_path):
         # Load default config
@@ -95,12 +100,9 @@ class SimulationCLI:
 
     def run(self):
         args = self.parser.parse_args()
-
-        # Load config from file
         config = self.load_config(args.config)
-
-        # Update config with command line arguments
         config = self.update_config_from_args(config, args)
+        
         print("\nFinal configuration:")
         for section, values in config.items():
             print(f"\n[{section}]")
@@ -110,4 +112,4 @@ class SimulationCLI:
         from .solver import LidDrivenCavitySolver
 
         solver = LidDrivenCavitySolver(config)
-        return solver.simulate()
+        return solver.run()

@@ -7,12 +7,12 @@ import time
 
 class Visualizer:
     def __init__(self, config):
+        self.cfg = config
         self.interval = config["visualization"]["plot_interval"]
         self.levels = config["visualization"]["contour_levels"]
-        self.quiver_spacing = config["visualization"]["quiver_spacing"]
-        self.start_time = time.time()
+        self.spacing = config["visualization"]["quiver_spacing"]
+        self.t0 = time.time()
 
-        # Set up professional style
         plt.style.use("default")
         mpl.rcParams.update(
             {
@@ -29,40 +29,47 @@ class Visualizer:
             }
         )
 
-        # Custom colormap for fluid simulation
-        self.cmap = plt.cm.get_cmap("viridis").copy()
-        self.cmap.set_bad(color="white")
+        self.colormap = plt.cm.get_cmap("viridis").copy()
+        self.colormap.set_bad("white")
 
-    def format_time(self, elapsed_seconds):
-        """Format elapsed time in appropriate units"""
-        if elapsed_seconds < 60:
-            return f"{elapsed_seconds:.1f}s"
-        elif elapsed_seconds < 3600:
-            minutes = elapsed_seconds / 60
-            return f"{minutes:.1f}min"
+    def _format_time(self, seconds_elapsed):
+        if seconds_elapsed < 60:
+            return f"{seconds_elapsed:.1f}s"
+        elif seconds_elapsed < 3600:
+            return f"{seconds_elapsed / 60:.1f}min"
         else:
-            hours = elapsed_seconds / 3600
-            return f"{hours:.1f}hr"
+            return f"{seconds_elapsed / 3600:.1f}hr"
 
     def animate(self, solver):
-        print("Setting up visualization...")
-        # Prepare grid
-        x = np.linspace(0, solver.L, solver.nx)
-        y = np.linspace(0, solver.L, solver.ny)
+        print("Preparing visualization window...")
+        draw_vectors = self.cfg["visualization"].get("show_velocities", False)
+
+        x = np.linspace(0, solver.length, solver.nx)
+        y = np.linspace(0, solver.length, solver.ny)
         X, Y = np.meshgrid(x, y)
 
-        # Set up figure and initial plots with improved styling
         fig, ax = plt.subplots(figsize=(12, 10))
         fig.patch.set_facecolor("white")
         plt.tight_layout(pad=3.0)
 
-        # Initial plot with enhanced styling
-        contour = ax.contourf(X, Y, solver.psi, levels=self.levels, cmap=self.cmap)
-        quiver = ax.quiver(
-            X[:: self.quiver_spacing, :: self.quiver_spacing],
-            Y[:: self.quiver_spacing, :: self.quiver_spacing],
-            solver.u[:: self.quiver_spacing, :: self.quiver_spacing],
-            solver.v[:: self.quiver_spacing, :: self.quiver_spacing],
+        contour = ax.contourf(
+            X, Y, solver.stream, levels=self.levels, cmap=self.colormap
+        )
+
+        if draw_vectors:
+            qx, qy = X, Y
+            u_display, v_display = solver.u, solver.v
+        else:
+            qx = X[:: self.spacing, :: self.spacing]
+            qy = Y[:: self.spacing, :: self.spacing]
+            u_display = solver.u[:: self.spacing, :: self.spacing]
+            v_display = solver.v[:: self.spacing, :: self.spacing]
+
+        arrows = ax.quiver(
+            qx,
+            qy,
+            u_display,
+            v_display,
             scale=50,
             color="white",
             alpha=0.8,
@@ -71,64 +78,56 @@ class Visualizer:
             headlength=5,
         )
 
-        # Enhanced colorbar
-        cbar = fig.colorbar(contour, ax=ax, pad=0.02)
-        cbar.set_label("Stream Function", fontsize=12, labelpad=10)
-        cbar.ax.tick_params(labelsize=10)
+        colorbar = fig.colorbar(contour, ax=ax, pad=0.02)
+        colorbar.set_label("Stream Function", fontsize=12)
+        colorbar.ax.tick_params(labelsize=10)
 
-        # Enhanced labels and title
-        ax.set_xlabel("X", fontsize=12, labelpad=10)
-        ax.set_ylabel("Y", fontsize=12, labelpad=10)
+        ax.set_xlabel("X", fontsize=12)
+        ax.set_ylabel("Y", fontsize=12)
         ax.set_title("Lid-Driven Cavity Flow", fontsize=16, pad=20, weight="bold")
-
-        # Add grid with custom styling
         ax.grid(True, linestyle="--", alpha=0.3)
-
-        # Set axis limits with padding
-        ax.set_xlim(-0.05, solver.L + 0.05)
-        ax.set_ylim(-0.05, solver.L + 0.05)
+        ax.set_xlim(-0.05, solver.length + 0.05)
+        ax.set_ylim(-0.05, solver.length + 0.05)
 
         def update(frame):
-            print(f"Updating frame {frame}...", end="\r")
-            solver.apply_boundary_conditions()
-            solver.solve_streamfunction()
-            solver.solve_vorticity_transport()
-            solver.calculate_velocity()
+            print(f"Frame {frame} in progress...", end="\r")
 
-            # Calculate elapsed time
-            elapsed_time = time.time() - self.start_time
-            formatted_time = self.format_time(elapsed_time)
+            solver.impose_boundary_conditions()
+            solver.solve_stream_function()
+            solver.update_vorticity()
+            solver.update_velocity_field()
 
-            # Clear previous contour
-            for coll in ax.collections:
-                coll.remove()
+            elapsed = time.time() - self.t0
+            formatted = self._format_time(elapsed)
 
-            # Draw new contour with enhanced styling
+            for c in ax.collections:
+                c.remove()
             new_contour = ax.contourf(
-                X, Y, solver.psi, levels=self.levels, cmap=self.cmap
+                X, Y, solver.stream, levels=self.levels, cmap=self.colormap
             )
 
-            # Update quiver with enhanced styling
-            quiver.set_UVC(
-                solver.u[:: self.quiver_spacing, :: self.quiver_spacing],
-                solver.v[:: self.quiver_spacing, :: self.quiver_spacing],
-            )
+            if draw_vectors:
+                arrows.set_UVC(solver.u, solver.v)
+            else:
+                arrows.set_UVC(
+                    solver.u[:: self.spacing, :: self.spacing],
+                    solver.v[:: self.spacing, :: self.spacing],
+                )
 
-            # Enhanced title with more information including elapsed time
             ax.set_title(
                 f"Lid-Driven Cavity Flow\n"
-                f"Re = {solver.Re:.0f}, t = {frame*solver.dt:.3f}s\n"
+                f"Re = {solver.reynolds:.0f}, t = {frame * solver.dt:.3f}s\n"
                 f"Grid: {solver.nx}×{solver.ny}\n"
-                f"Elapsed Time: {formatted_time}",
+                f"Elapsed Time: {formatted}",
                 fontsize=14,
                 pad=20,
                 weight="bold",
             )
 
-            return [new_contour] + [quiver]
+            return [new_contour] + [arrows]
 
-        print("Starting animation...")
-        anim = FuncAnimation(
-            fig, update, frames=solver.max_iter, interval=self.interval, blit=False
+        print("Launching animation loop...")
+        animation = FuncAnimation(
+            fig, update, frames=solver.steps, interval=self.interval, blit=False
         )
-        return anim
+        return animation

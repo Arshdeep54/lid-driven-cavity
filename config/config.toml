@@ -1,15 +1,11 @@
 [simulation]
-reynolds_number = 1000
+reynolds_number = 400
 lid_velocity = 1.0
 cavity_size = 1.0
-grid_points_x = 500
-grid_points_y = 500
-time_step = 0.00001
-max_iterations = 1000
-
-[stability]
-cfl_number = 0.5
-artificial_viscosity = 0.1
+grid_points_x = 100
+grid_points_y = 100
+time_step = 0.0001
+max_iterations = 10000
 
 [visualization]
 plot_interval = 50

@@ -1,147 +1,109 @@
 import numpy as np
-from .utils.visualization import Visualizer
 import matplotlib.pyplot as plt
+from .utils.visualization import Visualizer
 
 
 class LidDrivenCavitySolver:
     def __init__(self, config):
-        # Simulation parameters
-        self.Re = config["simulation"]["reynolds_number"]
-        self.U = config["simulation"]["lid_velocity"]
-        self.L = config["simulation"]["cavity_size"]
-        self.nx = config["simulation"]["grid_points_x"]
-        self.ny = config["simulation"]["grid_points_y"]
-        self.dt = config["simulation"]["time_step"]
-        self.max_iter = config["simulation"]["max_iterations"]
+        # Extract simulation settings from config
+        sim = config["simulation"]
+        self.reynolds = sim["reynolds_number"]
+        self.lid_speed = sim["lid_velocity"]
+        self.length = sim["cavity_size"]
+        self.nx = sim["grid_points_x"]
+        self.ny = sim["grid_points_y"]
+        self.dt = sim["time_step"]
+        self.steps = sim["max_iterations"]
 
-        # Stability parameters
-        self.CFL = config["stability"]["cfl_number"]
-        self.eps = config["stability"]["artificial_viscosity"]
+        # Grid size
+        self.dx = self.length / (self.nx - 1)
+        self.dy = self.length / (self.ny - 1)
 
-        # Grid spacing
-        self.dx = self.L / (self.nx - 1)
-        self.dy = self.L / (self.ny - 1)
+        # Initialize flow fields
+        self.stream = np.zeros((self.ny, self.nx))
+        self.vorticity = np.zeros((self.ny, self.nx))
+        self.u = np.zeros((self.ny, self.nx))  # horizontal velocity
+        self.v = np.zeros((self.ny, self.nx))  # vertical velocity
 
-        # Initialize fields
-        self.psi = np.zeros((self.ny, self.nx))
-        self.vort = np.zeros((self.ny, self.nx))
-        self.u = np.zeros((self.ny, self.nx))
-        self.v = np.zeros((self.ny, self.nx))
-
-        # Coefficients
-        self.alpha = 1 / (self.Re * self.dx**2)
-        self.beta = 1 / (self.Re * self.dy**2)
-        self.gamma = 1 / (2 * self.dx)
-        self.delta = 1 / (2 * self.dy)
-
-        # Initialize visualizer
+        # Visualizer
         self.visualizer = Visualizer(config)
 
-    def apply_boundary_conditions(self):
-        """Apply boundary conditions for stream function and vorticity"""
-        self._apply_top_wall_conditions()
-        self._apply_bottom_wall_conditions()
-        self._apply_side_wall_conditions()
+    def impose_boundary_conditions(self):
+        """Set stream function and vorticity on all four walls"""
+        self._top_lid()
+        self._bottom_wall()
+        self._side_walls()
 
-    def _apply_top_wall_conditions(self):
-        """Apply conditions for the moving lid (top wall)"""
-        self.psi[-1, :] = 0
-        self.vort[-1, :] = (
-            self.psi[-1, :] - self.psi[-2, :]
-        ) / self.dy**2 - 2 * self.U / self.dy
-
-    def _apply_bottom_wall_conditions(self):
-        """Apply conditions for the bottom wall"""
-        self.psi[0, :] = 0
-        self.vort[0, :] = (self.psi[0, :] - self.psi[1, :]) / self.dy**2
-
-    def _apply_side_wall_conditions(self):
-        """Apply conditions for the left and right walls"""
-        # Left wall
-        self.psi[:, 0] = 0
-        self.vort[:, 0] = (self.psi[:, 0] - self.psi[:, 1]) / self.dx**2
-
-        # Right wall
-        self.psi[:, -1] = 0
-        self.vort[:, -1] = (self.psi[:, -1] - self.psi[:, -2]) / self.dx**2
-
-    def solve_streamfunction(self):
-        """Solve Poisson equation for stream function using finite differences"""
-        for _ in range(self.max_iter):
-            psi_old = self.psi.copy()
-            self._update_streamfunction()
-
-            if self._check_streamfunction_convergence(psi_old):
-                break
-
-    def _update_streamfunction(self):
-        """Update stream function values for interior points"""
-        self.psi[1:-1, 1:-1] = (
-            self.dy**2 * (self.psi[1:-1, 2:] + self.psi[1:-1, :-2])
-            + self.dx**2 * (self.psi[2:, 1:-1] + self.psi[:-2, 1:-1])
-            - self.dx**2 * self.dy**2 * self.vort[1:-1, 1:-1]
-        ) / (2 * (self.dx**2 + self.dy**2))
-
-    def _check_streamfunction_convergence(self, psi_old):
-        """Check if stream function solution has converged"""
-        return np.max(np.abs(self.psi - psi_old)) < 1e-6
-
-    def solve_vorticity_transport(self):
-        """Solve vorticity transport equation using FTCS scheme"""
-        vort_new = self.vort.copy()
-
-        # Calculate velocities and time step
-        self.calculate_velocity()
-        dt_actual = self._calculate_stable_timestep()
-
-        # Update vorticity
-        vort_new[1:-1, 1:-1] = self._compute_vorticity_update(dt_actual)
-        self.vort = vort_new
-
-    def _calculate_stable_timestep(self):
-        """Calculate stable time step based on CFL condition"""
-        max_u = np.max(np.abs(self.u))
-        max_v = np.max(np.abs(self.v))
-
-        # Prevent divide by zero
-        if max_u == 0 or max_v == 0:
-            return self.dt
-
-        dt_cfl = min(self.dx / max_u, self.dy / max_v) * self.CFL
-        return min(self.dt, dt_cfl)
-
-    def _compute_vorticity_update(self, dt):
-        """Compute vorticity update for interior points"""
-        # Calculate spatial derivatives
-        dvort_dx = (self.vort[1:-1, 2:] - self.vort[1:-1, :-2]) / (2 * self.dx)
-        dvort_dy = (self.vort[2:, 1:-1] - self.vort[:-2, 1:-1]) / (2 * self.dy)
-
-        # Calculate Laplacian
-        laplacian_vort = self._compute_vorticity_laplacian()
-
-        # Compute update
-        return self.vort[1:-1, 1:-1] + dt * (
-            -self.u[1:-1, 1:-1] * dvort_dx
-            - self.v[1:-1, 1:-1] * dvort_dy
-            + (1 / self.Re + self.eps) * laplacian_vort
+    def _top_lid(self):
+        """Top wall moves at constant speed (lid)"""
+        self.stream[-1, :] = 0
+        self.vorticity[-1, :] = (
+            (self.stream[-1, :] - self.stream[-2, :]) / self.dy**2
+            - 2 * self.lid_speed / self.dy
         )
 
-    def _compute_vorticity_laplacian(self):
-        """Compute Laplacian of vorticity"""
-        return (
-            self.vort[1:-1, 2:] - 2 * self.vort[1:-1, 1:-1] + self.vort[1:-1, :-2]
-        ) / self.dx**2 + (
-            self.vort[2:, 1:-1] - 2 * self.vort[1:-1, 1:-1] + self.vort[:-2, 1:-1]
-        ) / self.dy**2
+    def _bottom_wall(self):
+        """Bottom wall is stationary"""
+        self.stream[0, :] = 0
+        self.vorticity[0, :] = (self.stream[0, :] - self.stream[1, :]) / self.dy**2
 
-    def calculate_velocity(self):
-        """Calculate velocity components from stream function"""
-        self.u[1:-1, 1:-1] = (self.psi[1:-1, 2:] - self.psi[1:-1, :-2]) / (2 * self.dy)
-        self.v[1:-1, 1:-1] = -(self.psi[2:, 1:-1] - self.psi[:-2, 1:-1]) / (2 * self.dx)
+    def _side_walls(self):
+        """Left and right walls (stationary)"""
+        self.stream[:, 0] = 0
+        self.vorticity[:, 0] = (self.stream[:, 0] - self.stream[:, 1]) / self.dx**2
 
-    def simulate(self):
-        """Main simulation loop"""
-        print("Starting simulation...")
-        anim = self.visualizer.animate(self)
-        print("Animation created, displaying...")
-        return anim
+        self.stream[:, -1] = 0
+        self.vorticity[:, -1] = (self.stream[:, -1] - self.stream[:, -2]) / self.dx**2
+
+    def solve_stream_function(self):
+        """Use Jacobi iteration to solve the Poisson equation"""
+        for _ in range(self.steps):
+            previous = self.stream.copy()
+
+            self.stream[1:-1, 1:-1] = (
+                self.dy**2 * (self.stream[1:-1, 2:] + self.stream[1:-1, :-2])
+                + self.dx**2 * (self.stream[2:, 1:-1] + self.stream[:-2, 1:-1])
+                - self.dx**2 * self.dy**2 * self.vorticity[1:-1, 1:-1]
+            ) / (2 * (self.dx**2 + self.dy**2))
+
+            if np.max(np.abs(self.stream - previous)) < 1e-6:
+                break
+
+    def update_vorticity(self):
+        """Advance vorticity using Forward Euler in time and central difference in space"""
+        omega = self.vorticity.copy()
+        self.update_velocity_field()
+
+        u = self.u
+        v = self.v
+
+        # Compute spatial derivatives
+        dwdx = (omega[1:-1, 2:] - omega[1:-1, :-2]) / (2 * self.dx)
+        dwdy = (omega[2:, 1:-1] - omega[:-2, 1:-1]) / (2 * self.dy)
+
+        laplacian = (
+            (omega[1:-1, 2:] - 2 * omega[1:-1, 1:-1] + omega[1:-1, :-2]) / self.dx**2
+            + (omega[2:, 1:-1] - 2 * omega[1:-1, 1:-1] + omega[:-2, 1:-1]) / self.dy**2
+        )
+
+        omega[1:-1, 1:-1] += self.dt * (
+            -u[1:-1, 1:-1] * dwdx - v[1:-1, 1:-1] * dwdy + (1 / self.reynolds) * laplacian
+        )
+
+        self.vorticity = omega
+
+    def update_velocity_field(self):
+        """Compute velocity from stream function gradients"""
+        self.u[1:-1, 1:-1] = (
+            self.stream[1:-1, 2:] - self.stream[1:-1, :-2]
+        ) / (2 * self.dy)
+        self.v[1:-1, 1:-1] = (
+            -self.stream[2:, 1:-1] + self.stream[:-2, 1:-1]
+        ) / (2 * self.dx)
+
+    def run(self):
+        """Run the entire simulation and animate it"""
+        print("Simulation started...")
+        animation = self.visualizer.animate(self)
+        print("Rendering complete.")
+        return animation
