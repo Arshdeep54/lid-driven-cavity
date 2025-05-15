@@ -1,0 +1,13 @@
+[simulation]
+reynolds_number = 400
+lid_velocity = 1.0
+cavity_size = 1.0
+grid_points_x = 100
+grid_points_y = 100
+time_step = 0.0001
+max_iterations = 10000
+
+[visualization]
+plot_interval = 50
+contour_levels = 20
+quiver_spacing = 2 
