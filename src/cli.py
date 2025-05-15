@@ -1,7 +1,7 @@
 import argparse
 import tomli
 from pathlib import Path
-
+from .solver import LidDrivenCavitySolver
 
 class SimulationCLI:
     def __init__(self):
@@ -14,7 +14,6 @@ class SimulationCLI:
             default="config/config.toml",
             help="Path to configuration file",
         )
-        # Add arguments for each config parameter
         self.parser.add_argument(
             "--reynolds_number", type=float, help="Reynolds number"
         )
@@ -40,7 +39,6 @@ class SimulationCLI:
         )
 
     def load_config(self, config_path):
-        # Load default config
         default_config = {
             "simulation": {
                 "reynolds_number": 100,
@@ -59,12 +57,10 @@ class SimulationCLI:
             },
         }
 
-        # Load user config if exists
         config_path = Path(config_path)
         if config_path.exists():
             with open(config_path, "rb") as f:
                 user_config = tomli.load(f)
-                # Update default config with user values
                 for section, values in user_config.items():
                     if section in default_config:
                         default_config[section].update(values)
@@ -72,8 +68,6 @@ class SimulationCLI:
         return default_config
 
     def update_config_from_args(self, config, args):
-        """Update config with command line arguments if provided"""
-        # Map argument names to config paths
         arg_to_config = {
             "reynolds_number": ("simulation", "reynolds_number"),
             "lid_velocity": ("simulation", "lid_velocity"),
@@ -89,7 +83,6 @@ class SimulationCLI:
             "quiver_spacing": ("visualization", "quiver_spacing"),
         }
 
-        # Update config with provided arguments
         for arg_name, (section, key) in arg_to_config.items():
             value = getattr(args, arg_name)
             if value is not None:
@@ -108,8 +101,6 @@ class SimulationCLI:
             print(f"\n[{section}]")
             for key, value in values.items():
                 print(f"{key} = {value}")
-
-        from .solver import LidDrivenCavitySolver
 
         solver = LidDrivenCavitySolver(config)
         return solver.run()

@@ -8,35 +8,37 @@ This project simulates the lid-driven cavity flow problem using the Navier–Sto
 
 The Navier–Stokes equations for incompressible flow are:
 
-\[
+$$
 \frac{\partial \mathbf{u}}{\partial t} + (\mathbf{u} \cdot \nabla) \mathbf{u} = -\frac{1}{\rho} \nabla p + \nu \nabla^2 \mathbf{u}
-\]
+$$
 
-\[
+$$
 \nabla \cdot \mathbf{u} = 0
-\]
+$$
 
-In the vorticity-streamfunction formulation, we introduce the streamfunction \(\psi\) and vorticity \(\omega\):
+In the vorticity-streamfunction formulation, we introduce the streamfunction $\psi$ and vorticity $\omega$:
 
-\[
+$$
 \omega = \nabla \times \mathbf{u}
-\]
+$$
 
-\[
+$$
 \mathbf{u} = \nabla \times \psi
-\]
+$$
 
 This reduces the problem to solving two coupled equations:
 
 1. **Poisson equation for the streamfunction:**
-   \[
+
+   $$
    \nabla^2 \psi = -\omega
-   \]
+   $$
 
 2. **Vorticity transport equation:**
-   \[
+
+   $$
    \frac{\partial \omega}{\partial t} + (\mathbf{u} \cdot \nabla) \omega = \nu \nabla^2 \omega
-   \]
+   $$
 
 ## Key Components
 
@@ -46,7 +48,7 @@ The `LidDrivenCavitySolver` class implements the numerical solution:
 
 - **Initialization:** Sets up the grid, flow fields, and simulation parameters.
 - **Boundary Conditions:** Imposes no-slip conditions on the walls and moving lid.
-- **Streamfunction Solver:** Uses Jacobi iteration to solve the Poisson equation for \(\psi\).
+- **Streamfunction Solver:** Uses Jacobi iteration to solve the Poisson equation for $\psi$.
 - **Vorticity Transport:** Advances the vorticity field using a finite-difference scheme.
 - **Velocity Update:** Computes the velocity field from the streamfunction gradients.
 
@@ -75,6 +77,7 @@ The `Visualizer` class handles the animation:
    ```
 
 2. Install dependencies:
+
    ```bash
    pip install -r requirements.txt
    ```
@@ -97,7 +100,6 @@ max_iterations = 1000
 plot_interval = 50
 contour_levels = 20
 quiver_spacing = 5
-show_velocities = true  # Set to false to hide velocity vectors
 ```
 
 ### Running the Simulation
@@ -110,16 +112,24 @@ python src/main.py
 
 ### Command-Line Options
 
-- **`--show_velocities`:** Toggle visibility of velocity vectors (default: `true`).
 - **`--reynolds`:** Set the Reynolds number (default: `1000`).
 
 Example:
 
 ```bash
-python src/main.py --show_velocities false --reynolds 500
+python src/main.py --reynolds 500
 ```
 
 ## Results
 
 The simulation produces an animated visualization of the lid-driven cavity flow, showing the streamfunction contour and velocity vectors. The title displays the Reynolds number, simulation time, grid size, and elapsed runtime.
 
+### Example Output
+
+![Simulation Result](media/image.png)
+
+[Watch the simulation video (fluid.webm)](media/fluid.webm)
+
+## License
+
+This project is licensed under the MIT License. See the `LICENSE` file for details.

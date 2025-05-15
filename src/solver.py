@@ -2,10 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from .utils.visualization import Visualizer
 
-
 class LidDrivenCavitySolver:
     def __init__(self, config):
-        # Extract simulation settings from config
         sim = config["simulation"]
         self.reynolds = sim["reynolds_number"]
         self.lid_speed = sim["lid_velocity"]
@@ -15,17 +13,14 @@ class LidDrivenCavitySolver:
         self.dt = sim["time_step"]
         self.steps = sim["max_iterations"]
 
-        # Grid size
         self.dx = self.length / (self.nx - 1)
         self.dy = self.length / (self.ny - 1)
 
-        # Initialize flow fields
         self.stream = np.zeros((self.ny, self.nx))
         self.vorticity = np.zeros((self.ny, self.nx))
-        self.u = np.zeros((self.ny, self.nx))  # horizontal velocity
-        self.v = np.zeros((self.ny, self.nx))  # vertical velocity
+        self.u = np.zeros((self.ny, self.nx))  
+        self.v = np.zeros((self.ny, self.nx))  
 
-        # Visualizer
         self.visualizer = Visualizer(config)
 
     def impose_boundary_conditions(self):
@@ -70,14 +65,12 @@ class LidDrivenCavitySolver:
                 break
 
     def update_vorticity(self):
-        """Advance vorticity using Forward Euler in time and central difference in space"""
         omega = self.vorticity.copy()
         self.update_velocity_field()
 
         u = self.u
         v = self.v
 
-        # Compute spatial derivatives
         dwdx = (omega[1:-1, 2:] - omega[1:-1, :-2]) / (2 * self.dx)
         dwdy = (omega[2:, 1:-1] - omega[:-2, 1:-1]) / (2 * self.dy)
 
@@ -93,7 +86,6 @@ class LidDrivenCavitySolver:
         self.vorticity = omega
 
     def update_velocity_field(self):
-        """Compute velocity from stream function gradients"""
         self.u[1:-1, 1:-1] = (
             self.stream[1:-1, 2:] - self.stream[1:-1, :-2]
         ) / (2 * self.dy)
@@ -102,7 +94,6 @@ class LidDrivenCavitySolver:
         ) / (2 * self.dx)
 
     def run(self):
-        """Run the entire simulation and animate it"""
         print("Simulation started...")
         animation = self.visualizer.animate(self)
         print("Rendering complete.")
